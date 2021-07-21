@@ -78,5 +78,5 @@ if [[ $1 =~ ^[^/:]+: ]]; then
 	basename "${1#*:}" .git
 else
 	basename "$1" .git
-fi
+fi | sed 's/-homeshick$//'
 }
