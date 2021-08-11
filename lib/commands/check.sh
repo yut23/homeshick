@@ -24,11 +24,10 @@ function check {
 	local remote_head
 	remote_head=$(git ls-remote --heads "$remote_url" "$branch" 2>/dev/null | cut -f 1)
 	if [[ $remote_head ]]; then
-		local local_head
+		local local_head git_status
 		local_head=$(cd "$repo" && git rev-parse HEAD)
+		git_status=$(cd "$repo" && git status --porcelain 2>/dev/null)
 		if [[ $remote_head == "$local_head" ]]; then
-			local git_status
-			git_status=$(cd "$repo" && git status --porcelain 2>/dev/null)
 			if [[ -z $git_status ]]; then
 				success 'up to date'
 				exit_status=$EX_SUCCESS
@@ -44,10 +43,18 @@ function check {
 			# inlining checked_ref result makes the code unreadable
 			# shellcheck disable=SC2181
 			if [[ $? == 0 && $merge_base != "" && $merge_base == "$checked_ref" ]]; then
-				fail 'ahead'
+				if [[ -z $git_status ]]; then
+					fail 'ahead'
+				else
+					fail 'ahead*'
+				fi
 				exit_status=$EX_AHEAD
 			else
-				fail 'behind'
+				if [[ -z $git_status ]]; then
+					fail 'behind'
+				else
+					fail 'behind*'
+				fi
 				exit_status=$EX_BEHIND
 			fi
 		fi
