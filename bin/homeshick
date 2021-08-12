@@ -169,6 +169,7 @@ case $cmd in
 	cd)    help cd        ;; # cd is implemented in the homeshick.{sh,csh} helper script.
 	help)  help $help_cmd ;;
 	*)
+		declare -a pending
 		for param in "${params[@]}"; do
 			case $cmd in
 				clone)
@@ -180,7 +181,7 @@ case $cmd in
 				refresh)
 					(refresh $threshhold "$param") ;;
 				pull)
-					(pull "$param") ;;
+					(pull "$param") && pending+=("$param") ;;
 				symlink|link)
 					symlink "$param" ;;
 				track)
@@ -200,7 +201,7 @@ case $cmd in
 			refresh)
 				pull_outdated $threshhold "${params[@]}" ;;
 			pull)
-				symlink_new_files "${params[@]}" ;;
+				symlink_new_files "${pending[@]}" ;;
 		esac
 		result=$?
 		if [[ $exit_status == 0 && $result != 0 ]]; then
