@@ -84,7 +84,7 @@ EOF
 	esc="\\u001b\\u005b"
 	cat <<EOF | expect -f -
 			spawn "$HOMESHICK_BIN" check rc-files
-			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m       behind${esc}0m rc-files\r\n" {} default {exit 1}
+			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m      behind*${esc}0m rc-files\r\n" {} default {exit 1}
 EOF
 }
 
@@ -98,7 +98,7 @@ EOF
 	esc="\\u001b\\u005b"
 	cat <<EOF | expect -f -
 			spawn "$HOMESHICK_BIN" check rc-files
-			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m       behind${esc}0m rc-files\r\n" {} default {exit 1}
+			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m      behind*${esc}0m rc-files\r\n" {} default {exit 1}
 EOF
 }
 
@@ -112,7 +112,7 @@ EOF
 	esc="\\u001b\\u005b"
 	cat <<EOF | expect -f -
 			spawn "$HOMESHICK_BIN" check rc-files
-			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m       behind${esc}0m rc-files\r\n" {} default {exit 1}
+			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m      behind*${esc}0m rc-files\r\n" {} default {exit 1}
 EOF
 }
 
@@ -140,7 +140,7 @@ EOF
 	esc="\\u001b\\u005b"
 	cat <<EOF | expect -f -
 			spawn "$HOMESHICK_BIN" check rc-files
-			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m        ahead${esc}0m rc-files\r\n" {} default {exit 1}
+			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m       ahead*${esc}0m rc-files\r\n" {} default {exit 1}
 EOF
 }
 
@@ -154,7 +154,7 @@ EOF
 	esc="\\u001b\\u005b"
 	cat <<EOF | expect -f -
 			spawn "$HOMESHICK_BIN" check rc-files
-			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m        ahead${esc}0m rc-files\r\n" {} default {exit 1}
+			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m       ahead*${esc}0m rc-files\r\n" {} default {exit 1}
 EOF
 }
 
@@ -168,7 +168,7 @@ EOF
 	esc="\\u001b\\u005b"
 	cat <<EOF | expect -f -
 			spawn "$HOMESHICK_BIN" check rc-files
-			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m        ahead${esc}0m rc-files\r\n" {} default {exit 1}
+			expect -ex "${esc}1;36m     checking${esc}0m rc-files\r${esc}1;31m       ahead*${esc}0m rc-files\r\n" {} default {exit 1}
 EOF
 }
 
