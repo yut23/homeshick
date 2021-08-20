@@ -181,7 +181,13 @@ case $cmd in
 				refresh)
 					(refresh $threshhold "$param") ;;
 				pull)
-					(pull "$param") && pending+=("$param") ;;
+					prev_hash=$(cd "$repos/$param" && git rev-parse HEAD)
+					(pull "$param")
+					result=$?
+					curr_hash=$(cd "$repos/$param" && git rev-parse HEAD)
+					[[ "$prev_hash" != "$curr_hash" ]] && pending+=("$param")
+					(exit $result)
+					;;
 				symlink|link)
 					symlink "$param" ;;
 				track)

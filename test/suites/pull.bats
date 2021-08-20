@@ -77,6 +77,15 @@ EOF
 	[ -f "$HOME/.gitignore" ]
 }
 
+@test 'pull after symlinking new files' {
+	castle 'rc-files'
+	(cd "$HOME/.homesick/repos/rc-files" && git reset --hard HEAD~1 >/dev/null)
+	homeshick link --batch --quiet rc-files
+	homeshick pull --batch --force rc-files
+
+	expect_no_new_files rc-files
+}
+
 @test 'pull with no new files present' {
 	castle 'pull-test'
 	(cd "$HOME/.homesick/repos/pull-test" && git reset --hard HEAD~1 >/dev/null)
