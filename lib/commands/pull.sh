@@ -40,7 +40,7 @@ function symlink_new_files {
 		fi
 		local git_out
 		# @{1} refers to the previous reflog entry on the current branch
-		if ! git_out=$(cd "$repo" && git diff --name-only --diff-filter=A "@{1}" HEAD -- home 2>/dev/null | wc -l 2>&1); then
+		if ! git_out=$(cd "$repo" && git diff --name-only --diff-filter=AR "@{1}" HEAD -- home 2>/dev/null | wc -l 2>&1); then
 			continue  # Ignore errors, this operation is not mission critical
 		fi
 		if [[ $git_out -gt 0 ]]; then
