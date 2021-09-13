@@ -81,6 +81,17 @@ expect_no_new_files() {
   [ -f "$HOME/.gitignore" ]
 }
 
+@test 'pull prompts for symlinking with renamed files' {
+  castle 'pull-renamed'
+  # reset to before .bashrc-wrong-name was renamed to .bashrc
+  (cd "$HOME/.homesick/repos/pull-renamed" && git reset --hard HEAD~2 >/dev/null)
+  homeshick link --batch --quiet pull-renamed
+
+  [ ! -e "$HOME/.bashrc" ]
+  expect_new_files pull-renamed .bashrc
+  [ -f "$HOME/.bashrc" ]
+}
+
 @test 'pull with no new files present' {
   castle 'pull-test'
   (cd "$HOME/.homesick/repos/pull-test" && git reset --hard HEAD~1 >/dev/null)
