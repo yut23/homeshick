@@ -41,7 +41,7 @@ symlink_new_files() {
     local git_out
     local now
     now=$(date +%s)
-    if ! git_out=$(cd "$repo" && git diff --name-only --diff-filter=A "HEAD@{(($now-$T_START+1)).seconds.ago}" HEAD -- home 2>/dev/null | wc -l 2>&1); then
+    if ! git_out=$(cd "$repo" && git diff --name-only --diff-filter=AR "HEAD@{$((now-T_START+1)).seconds.ago}" HEAD -- home 2>/dev/null | wc -l 2>&1); then
       continue  # Ignore errors, this operation is not mission critical
     fi
     if [[ $git_out -gt 0 ]]; then
