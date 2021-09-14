@@ -1,5 +1,6 @@
 #!/bin/bash
 
+BEFORE_PULL_TAG=__homeshick-before-pull__
 function pull {
 	[[ ! $1 ]] && help_err pull
 	local castle=$1
@@ -12,6 +13,13 @@ function pull {
 		ignore 'no upstream' "Could not pull $castle, it has no upstream"
 		return "$EX_SUCCESS"
 	fi
+
+	# this tag is exceedingly unlikely to already exist, but if it does, stop
+	# immediately with EX_USAGE and let the user resolve it
+	(cd "$repo" && git rev-parse --verify "refs/tags/$BEFORE_PULL_TAG" &>/dev/null) && \
+		err "$EX_USAGE" "Pull marker tag ($BEFORE_PULL_TAG) already exists in $repo. Please resolve this before pulling."
+	# make a tag at the current commit, so we can compare against it below
+	(cd "$repo" && git tag "$BEFORE_PULL_TAG" 2>&1)
 
 	local git_out
 	git_out=$(cd "$repo" && git pull 2>&1) || \
@@ -35,13 +43,15 @@ function symlink_new_files {
 		local castle=$1
 		shift
 		local repo="$repos/$castle"
+		local before_pull
+		if ! before_pull=$(cd "$repo" && git rev-parse "refs/tags/$BEFORE_PULL_TAG" && git tag -d "$BEFORE_PULL_TAG" >/dev/null); then
+			continue
+		fi
 		if [[ ! -d $repo/home ]]; then
 			continue;
 		fi
 		local git_out
-		local now
-		now=$(date +%s)
-		if ! git_out=$(cd "$repo" && git diff --name-only --diff-filter=AR "HEAD@{$((now-T_START+1)).seconds.ago}" HEAD -- home 2>/dev/null | wc -l 2>&1); then
+		if ! git_out=$(cd "$repo" && git diff --name-only --diff-filter=AR "$before_pull" HEAD -- home 2>/dev/null | wc -l 2>&1); then
 			continue  # Ignore errors, this operation is not mission critical
 		fi
 		if [[ $git_out -gt 0 ]]; then

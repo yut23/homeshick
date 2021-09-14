@@ -2,21 +2,22 @@
 
 load ../helper
 
-backdate_git_operations() {
-	# This function changes the time of all git operations in the current
-	# subshell to be several (first argument, defaults to 5) seconds in the past.
-	local offset=${1:-5}
-	local timestamp
-	timestamp=$(( $(date +%s) - offset ))
-	# this is what is usually displayed by git log
-	export GIT_AUTHOR_DATE="@$timestamp"
-	# this is what most git commands actually care about (like @{1 second ago})
-	export GIT_COMMITTER_DATE="@$timestamp"
+BEFORE_PULL_TAG=__homeshick-before-pull__
+assert_tag_is_removed() {
+	for castle in "$@"; do
+		(
+			cd "$HOME/.homesick/repos/$castle" || return $?
+			# show all the tags if the test fails
+			git show-ref --tags >&2 || true
+			# this tag should not exist
+			run git rev-parse --verify "refs/tags/$BEFORE_PULL_TAG" >&2 2>&-
+			[ "$status" -ne 0 ] # should fail
+		)
+	done
 }
 
 reset_and_add_new_file() {
 	(
-		backdate_git_operations 3
 		cd "$HOME/.homesick/repos/pull-test" || return $?
 		git reset --hard "$1" >/dev/null
 
@@ -53,6 +54,7 @@ ${cyan}     symlink?${reset} ${open_bracket}yN${close_bracket} " {} default {exi
 ${cyan}      symlink${reset} ${file}\r${green}      symlink${reset} ${file}\r\n" {} default {exit 1}
 			expect eof {} "?" {exit 1} default {exit 1}
 EOF
+	assert_tag_is_removed "$castle"
 }
 
 expect_no_new_files() {
@@ -69,6 +71,7 @@ expect_no_new_files() {
 			# if there is any other output left, then fail
 			expect eof {} "?" {exit 1} default {exit 1}
 EOF
+	assert_tag_is_removed "$castle"
 }
 
 @test 'pull skips castles with no upstream remote' {
@@ -79,149 +82,60 @@ EOF
 	(cd "$HOMESICK/repos/rc-files" && git remote rm origin)
 	run "$HOMESHICK_FN" pull rc-files dotfiles
 	[ $status -eq 0 ] # EX_SUCCESS
+	assert_tag_is_removed rc-files dotfiles
 	# dotfiles FETCH_HEAD should exist if the castle was pulled
 	[ -e "$HOMESICK/repos/dotfiles/.git/FETCH_HEAD" ]
 }
 
 @test 'pull prompts for symlinking if new files are present' {
-	(
-	# make these operations happen several seconds in the past, so that
-	# symlink_new_files can tell what commits are new
-	backdate_git_operations
-	castle 'rc-files'
-	(cd "$HOME/.homesick/repos/rc-files" && git reset --hard HEAD~1 >/dev/null)
-	homeshick link --batch --quiet rc-files
-	)
+	local castle=rc-files
+	castle "$castle"
+	(cd "$HOME/.homesick/repos/$castle" && git reset --hard HEAD~1 >/dev/null)
+	homeshick link --batch --quiet "$castle"
 
 	[ ! -e "$HOME/.gitignore" ]
-	expect_new_files rc-files .gitignore
+	expect_new_files "$castle" .gitignore
 	[ -f "$HOME/.gitignore" ]
 }
 
 @test 'pull prompts for symlinking with renamed files' {
-	(
-	backdate_git_operations
-	castle 'pull-renamed'
+	local castle=pull-renamed
+	castle "$castle"
 	# reset to before .bashrc-wrong-name was renamed to .bashrc
-	(cd "$HOME/.homesick/repos/pull-renamed" && git reset --hard HEAD~2 >/dev/null)
-	homeshick link --batch --quiet pull-renamed
-	)
+	(cd "$HOME/.homesick/repos/$castle" && git reset --hard HEAD~2 >/dev/null)
+	homeshick link --batch --quiet "$castle"
 
 	[ ! -e "$HOME/.bashrc" ]
-	expect_new_files pull-renamed .bashrc
+	expect_new_files "$castle" .bashrc
 	[ -f "$HOME/.bashrc" ]
 }
 
 @test 'pull with no new files present' {
-	(
-	backdate_git_operations
-	castle 'pull-test'
-	(cd "$HOME/.homesick/repos/pull-test" && git reset --hard HEAD~1 >/dev/null)
-	)
+	local castle=pull-test
+	castle "$castle"
+	(cd "$HOME/.homesick/repos/$castle" && git reset --hard HEAD~1 >/dev/null)
 
-	expect_no_new_files pull-test
+	expect_no_new_files "$castle"
 }
 
-@test 'pull after symlinking new files' {
+@test 'pull a recently-pulled castle again' {
 	# this checks that we don't try to link files again if the last operation was
 	# a pull
-	(
-	backdate_git_operations
-	castle 'rc-files'
-	(cd "$HOME/.homesick/repos/rc-files" && git reset --hard HEAD~1 >/dev/null)
-	homeshick link --batch --quiet rc-files
-	backdate_git_operations 3
-	homeshick pull --batch --force rc-files
-	)
+	local castle=rc-files
+	castle "$castle"
+	(cd "$HOME/.homesick/repos/$castle" && git reset --hard HEAD~1 >/dev/null)
+	homeshick link --batch --quiet "$castle"
+	homeshick pull --batch --force "$castle"
 
-	expect_no_new_files rc-files
+	expect_no_new_files "$castle"
 }
 
-@test 'pull with local commits and no new files, merge' {
-	(
-	backdate_git_operations
-	castle 'pull-test'
-	reset_and_add_new_file HEAD~1
-	(cd "$HOME/.homesick/repos/pull-test" && git config pull.rebase false)
-	)
-
-	expect_no_new_files pull-test
-}
-
-@test 'pull with local commits and no new files, rebase' {
-	(
-	backdate_git_operations
-	castle 'pull-test'
-	reset_and_add_new_file HEAD~1
-	(cd "$HOME/.homesick/repos/pull-test" && git config pull.rebase true)
-	)
-
-	expect_no_new_files pull-test
-}
-
-@test 'pull with local commits and new files, merge' {
-	(
-	backdate_git_operations
-	castle 'pull-test'
+@test 'pull a castle with a git conflict' {
+	local castle=pull-test
+	castle "$castle"
 	reset_and_add_new_file HEAD~2
-	(cd "$HOME/.homesick/repos/pull-test" && git config pull.rebase false)
-	)
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase false && git config pull.ff only)
 
-	[ ! -e "$HOME/.gitignore" ]
-	expect_new_files pull-test .gitignore
-	[ -f "$HOME/.gitignore" ]
-}
-
-@test 'pull with local commits and new files, rebase' {
-	(
-	backdate_git_operations
-	castle 'pull-test'
-	reset_and_add_new_file HEAD~2
-	(cd "$HOME/.homesick/repos/pull-test" && git config pull.rebase true)
-	)
-
-	[ ! -e "$HOME/.gitignore" ]
-	expect_new_files pull-test .gitignore
-	[ -f "$HOME/.gitignore" ]
-}
-
-@test 'pull with local commits, fast-forward only, merge' {
-	(
-	backdate_git_operations
-	castle 'pull-test'
-	reset_and_add_new_file HEAD~2
-	(cd "$HOME/.homesick/repos/pull-test" && git config pull.rebase false && git config pull.ff only)
-	)
-
-	# git pull should fail, since the local branch can't be fast-forwarded
-	run homeshick pull --batch pull-test
-	[ $status -eq 70 ] # EX_SOFTWARE
-}
-
-@test 'pull with local commits, fast-forward only, rebase' {
-	(
-	backdate_git_operations
-	castle 'pull-test'
-	reset_and_add_new_file HEAD~2
-	(cd "$HOME/.homesick/repos/pull-test" && git config pull.rebase true && git config pull.ff only)
-	)
-
-	[ ! -e "$HOME/.gitignore" ]
-	expect_new_files pull-test .gitignore
-	[ -f "$HOME/.gitignore" ]
-}
-
-@test "pull skips symlinking if git fails" {
-	(
-	backdate_git_operations
-	castle 'pull-test'
-	reset_and_add_new_file HEAD~2
-	(cd "$HOME/.homesick/repos/pull-test" && git config pull.rebase false && git config pull.ff only)
-	)
-
-	[ ! -e "$HOME/.gitignore" ]
-	run homeshick pull --batch pull-test
-	[ $status -eq 70 ] # EX_SOFTWARE
 	[ ! -e "$HOME/.gitignore" ]
 	local open_bracket="\\u005b"
 	local close_bracket="\\u005d"
@@ -229,12 +143,138 @@ EOF
 	local red="${esc}1;31m"
 	local cyan="${esc}1;36m"
 	local reset="${esc}0m"
-	cat <<EOF | expect -f -
-			spawn "$HOMESHICK_DIR/bin/homeshick" pull --batch pull-test
-			expect -ex "${cyan}         pull${reset} pull-test\r${red}         pull${reset} pull-test\r
-${red}        error${reset} Unable to pull $HOME/.homesick/repos/pull-test. Git says:\r
+	status=0
+	cat <<EOF | expect -f - || status=$?
+			spawn "$HOMESHICK_DIR/bin/homeshick" pull --batch "$castle"
+			expect -ex "${cyan}         pull${reset} $castle\r${red}         pull${reset} $castle\r
+${red}        error${reset} Unable to pull $HOME/.homesick/repos/$castle. Git says:\r
 fatal: Not possible to fast-forward, aborting.\r\n" {} default {exit 1}
 			# if there is any other output left, then fail
 			expect eof {} "?" {exit 1} default {exit 1}
+			catch wait result
+			exit [lindex \$result 3]
 EOF
+	[ $status -eq 70 ] # EX_SOFTWARE
+	assert_tag_is_removed "$castle"
+	[ ! -e "$HOME/.gitignore" ]
+}
+
+@test 'pull a castle where the marker tag already exists' {
+	local castle=rc-files
+	castle "$castle"
+	local tag_before tag_after
+	tag_before=$(cd "$HOME/.homesick/repos/$castle" &&
+		git reset --hard HEAD~1 >/dev/null &&
+		git tag "$BEFORE_PULL_TAG" HEAD^ >/dev/null &&
+		git rev-parse "$BEFORE_PULL_TAG"
+	)
+
+	[ ! -e "$HOME/.gitignore" ]
+	local open_bracket="\\u005b"
+	local close_bracket="\\u005d"
+	local esc="\\u001b$open_bracket"
+	local red="${esc}1;31m"
+	local cyan="${esc}1;36m"
+	local reset="${esc}0m"
+	status=0
+	cat <<EOF | expect -d -f - || status=$?
+			spawn "$HOMESHICK_DIR/bin/homeshick" pull --batch "$castle"
+			expect -ex "${cyan}         pull${reset} $castle\r${red}         pull${reset} $castle\r
+${red}        error${reset} Pull marker tag ($BEFORE_PULL_TAG) already exists in $HOME/.homesick/repos/$castle. Please resolve this before pulling.\r\n" {} default {exit 1}
+			# if there is any other output left, then fail
+			expect eof {} "?" {exit 1} default {exit 1}
+			catch wait result
+			exit [lindex \$result 3]
+EOF
+	[ $status -eq 64 ] # EX_USAGE
+	[ ! -e "$HOME/.gitignore" ]
+	# tag should not be touched
+	tag_after=$(cd "$HOME/.homesick/repos/$castle" && git rev-parse "$BEFORE_PULL_TAG")
+	[ "$tag_before" == "$tag_after" ]
+}
+
+# the following 8 tests test some of the various ways a git repo can handle
+# merges when pulling.
+@test 'pull with local commits and no new files, merge' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~1
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase false)
+
+	expect_no_new_files "$castle"
+}
+
+@test 'pull with local commits and no new files, rebase' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~1
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase true)
+
+	expect_no_new_files "$castle"
+}
+
+@test 'pull with local commits and new files, merge' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~2
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase false)
+
+	[ ! -e "$HOME/.gitignore" ]
+	expect_new_files "$castle" .gitignore
+	[ -f "$HOME/.gitignore" ]
+}
+
+@test 'pull with local commits and new files, rebase' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~2
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase true)
+
+	[ ! -e "$HOME/.gitignore" ]
+	expect_new_files "$castle" .gitignore
+	[ -f "$HOME/.gitignore" ]
+}
+
+@test 'pull with local commits and no new files, merge, ff-only' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~1
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase false && git config pull.ff only)
+
+	# git pull should fail, since the local branch can't be fast-forwarded
+	run homeshick pull --batch "$castle"
+	[ $status -eq 70 ] # EX_SOFTWARE
+	assert_tag_is_removed "$castle"
+}
+
+@test 'pull with local commits and no new files, rebase, ff-only' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~1
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase true && git config pull.ff only)
+
+	expect_no_new_files "$castle"
+}
+
+@test 'pull with local commits and new files, merge, ff-only' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~2
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase false && git config pull.ff only)
+
+	# git pull should fail, since the local branch can't be fast-forwarded
+	run homeshick pull --batch "$castle"
+	[ $status -eq 70 ] # EX_SOFTWARE
+	assert_tag_is_removed "$castle"
+}
+
+@test 'pull with local commits and new files, rebase, ff-only' {
+	local castle=pull-test
+	castle "$castle"
+	reset_and_add_new_file HEAD~2
+	(cd "$HOME/.homesick/repos/$castle" && git config pull.rebase true && git config pull.ff only)
+
+	[ ! -e "$HOME/.gitignore" ]
+	expect_new_files "$castle" .gitignore
+	[ -f "$HOME/.gitignore" ]
 }
